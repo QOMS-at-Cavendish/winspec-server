@@ -5,6 +5,9 @@ setup(
     version="0.1",
     packages=find_packages(),
     scripts=["start_winspec_server.py"],
+    install_requires=[
+          'websockets',
+      ],
 
     author="John Jarman",
     author_email="jcj27@cam.ac.uk",
