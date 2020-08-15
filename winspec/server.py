@@ -27,11 +27,10 @@ class WinspecServer:
 
         self.winspec = winspec_com.WinspecCOM()
 
-        self.winspec_vars = [
-            {'name':'wavelength',
-            'getter':self.winspec.get_wavelength,
-            'setter':self.winspec.set_wavelength}
-        ]
+        self.winspec_vars = {
+            'wavelength':{'getter':self.winspec.get_wavelength,
+                          'setter':self.winspec.set_wavelength}
+        }
 
     async def run(self):
         """
@@ -48,25 +47,19 @@ class WinspecServer:
 
     async def _serve(self, websocket, path):
         """
-        Handle incoming connections
+        Handles incoming connections, decodes commands and passes to the command
+        handler.
         """
         try:
             self.connections.add(websocket)
-            remote_ip = websocket.remote_address[0]
-            logging.info('Client connected from {}'.format(remote_ip))
+
             async for command in websocket:
-                # Decode and handle incoming commands
                 try:
+                    # Decode and handle incoming commands
                     cmd = json.loads(command)
                     await self._handle_command(cmd, websocket)
                 except json.JSONDecodeError as err:
-                    logging.error('JSONDecodeError')
-                    await websocket.send(json.dumps({'error':'JSONDecodeError',
-                                                    'errormsg':str(err)}))
-
-        except websockets.ConnectionClosed:
-            logging.info('Client disconnected from {}'.format(remote_ip))
-
+                    await self.handle_error(websocket, 'JSONDecodeError', str(err))
         finally:
             self.connections.discard(websocket)
 
@@ -80,21 +73,62 @@ class WinspecServer:
             - 'set': set variables
             - 'get': request value of specified variables
             - 'acquire': trigger acquisition
+
         """
-        if command['cmd'] == 'set':
-            # Set and read back variables
-            keys = command.keys()
-            completed_settings = dict()
+        ######################
+        # Set or get variables
+        ######################
+        if command['cmd'] in ('set', 'get'):
             try:
-                for var in self.winspec_vars:
-                    if var['name'] in keys:
+                keys = command.keys()
+                return_vals = dict()
+                for key in keys:
+                    # Loop through requested variables
+                    try:
+                        if key == 'cmd':
+                            continue
+
+                        # Retrieve the getter and setter functions for this variable
+                        var = self.winspec_vars[key]
+
                         loop = asyncio.get_running_loop()
                         with concurrent.futures.ThreadPoolExecutor() as executor:
-                            await loop.run_in_executor(executor, var['setter'], command[var['name']])
-                            completed_settings[var['name']] = await loop.run_in_executor(executor, var['getter'])
+                            # Getter/setter are blocking functions, so use a thread pool
+                            # to run them
+                            if command['cmd'] == 'set':
+                                await loop.run_in_executor(executor, var['setter'], command[key])
+                            return_vals[key] = await loop.run_in_executor(executor, var['getter'])
 
-            except winspec_com.WinspecError as err:
-                await websocket.send(json.dumps({'error':'WinspecError', 'errormsg':str(err)}))
+                    except winspec_com.WinspecError as err:
+                        await self.handle_error(websocket, 'WinspecError', str(err))
 
+                    except KeyError as err:
+                        await self.handle_error(websocket, 'KeyError', 
+                                    'Unrecognised variable {}'.format(str(err)))
             finally:
-                await websocket.send(json.dumps({'complete':True, **completed_settings}))
+                # Always send 'complete' message, regardless of errors
+                await websocket.send(json.dumps({'complete':True, **return_vals}))
+
+        #####################
+        # Trigger acquisition
+        #####################
+        if command['cmd'] == 'acquire':
+            spec = None
+            try:
+                loop = asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    # Acquire spectrum in a new thread
+                    spec = await loop.run_in_executor(executor, self.winspec.acquire_spectrum)
+            
+            except winspec_com.WinspecError as err:
+                await self.handle_error(websocket, 'WinspecError', str(err))
+            
+            finally:
+                await websocket.send(json.dumps({'complete':True, 'spectrum':spec}))
+
+    async def handle_error(self, websocket, err, errmsg):
+        """
+        Transmits error messages to the client and logs them
+        """
+        logging.error('{}: {}'.format(err, errmsg))
+        await websocket.send(json.dumps({'error':err, 'errormsg':errmsg}))

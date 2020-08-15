@@ -22,13 +22,20 @@ class WinspecCOM:
 
     def set_wavelength(self, wavelength):
         if not self._lock.acquire(blocking=False):
-            raise WinspecError('Unable to update wavelength due to concurrent operation', True)
+            raise WinspecError('Unable to update wavelength due to concurrent operation')
 
         logging.info('Set wavelength {}'.format(wavelength))
-        for i in range(5):
-            time.sleep(1)
+        time.sleep(1)
         self.wavelength = wavelength
         self._lock.release()
     
     def get_wavelength(self):
         return self.wavelength
+
+    def acquire_spectrum(self):
+        if not self._lock.acquire(blocking=False):
+            raise WinspecError('Unable to start acquisition due to concurrent operation')
+        logging.info('Acquire spectrum')
+        time.sleep(25)
+        self._lock.release()
+        logging.info('Acquire complete')

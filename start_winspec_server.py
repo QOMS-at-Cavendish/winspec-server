@@ -12,7 +12,7 @@ import sys
 
 logger = logging.getLogger()
 handler = logging.StreamHandler(stream=sys.stdout)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 logger.setLevel(logging.INFO)
 handler.setFormatter(formatter)
