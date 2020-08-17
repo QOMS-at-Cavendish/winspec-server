@@ -5,10 +5,11 @@ Run this script on the spectrometer computer to start the server.
 
 John Jarman <jcj27@cam.ac.uk>
 """
-import winspec.server
+import winspec
 import asyncio
 import logging
 import sys
+import winspec
 
 logger = logging.getLogger()
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -20,7 +21,7 @@ logger.addHandler(handler)
 
 # Start server
 try:
-    asyncio.run(winspec.server.WinspecServer().run())
+    asyncio.run(winspec.WinspecServer().run())
 
 except KeyboardInterrupt:
     pass

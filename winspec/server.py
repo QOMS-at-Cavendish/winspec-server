@@ -8,7 +8,7 @@ import concurrent.futures
 import logging
 import websockets
 import json
-from winspec import winspec_com
+import winspec
 
 class WinspecServer:
     """
@@ -25,7 +25,7 @@ class WinspecServer:
         self.port = port
         self.shutdown_request = False
 
-        self.winspec = winspec_com.WinspecCOM()
+        self.winspec = winspec.winspec_com.WinspecCOM()
 
         self.winspec_vars = {
             'wavelength':{'getter':self.winspec.get_wavelength,
@@ -52,15 +52,21 @@ class WinspecServer:
         """
         try:
             self.connections.add(websocket)
+            remote_ip = websocket.remote_address[0]
+            logging.info('Client connected ({})'.format(remote_ip))
 
+            # This loop will handle incoming messages until the client disconnects
             async for command in websocket:
                 try:
                     # Decode and handle incoming commands
                     cmd = json.loads(command)
                     await self._handle_command(cmd, websocket)
                 except json.JSONDecodeError as err:
-                    await self.handle_error(websocket, 'JSONDecodeError', str(err))
+                    await self._handle_error(websocket, winspec.WinspecError(
+                                             winspec.WinspecErrorCodes.JSONDecodeError, 
+                                             str(err)))
         finally:
+            logging.info('Client disconnected ({})'.format(remote_ip))
             self.connections.discard(websocket)
 
     async def _handle_command(self, command, websocket):
@@ -99,15 +105,16 @@ class WinspecServer:
                                 await loop.run_in_executor(executor, var['setter'], command[key])
                             return_vals[key] = await loop.run_in_executor(executor, var['getter'])
 
-                    except winspec_com.WinspecError as err:
-                        await self.handle_error(websocket, 'WinspecError', str(err))
+                    except winspec.WinspecError as err:
+                        await self._handle_error(websocket, err)
 
                     except KeyError as err:
-                        await self.handle_error(websocket, 'KeyError', 
-                                    'Unrecognised variable {}'.format(str(err)))
+                        await self._handle_error(websocket, winspec.WinspecError(
+                                    winspec.WinspecErrorCodes.UnrecognisedVariable, 
+                                    'Unrecognised variable {}'.format(str(err))))
             finally:
                 # Always send 'complete' message, regardless of errors
-                await websocket.send(json.dumps({'complete':True, **return_vals}))
+                await self._send_message(websocket, {'complete':True, **return_vals})
 
         #####################
         # Trigger acquisition
@@ -120,15 +127,21 @@ class WinspecServer:
                     # Acquire spectrum in a new thread
                     spec = await loop.run_in_executor(executor, self.winspec.acquire_spectrum)
             
-            except winspec_com.WinspecError as err:
-                await self.handle_error(websocket, 'WinspecError', str(err))
+            except winspec.WinspecError as err:
+                await self._handle_error(websocket, err)
             
             finally:
-                await websocket.send(json.dumps({'complete':True, 'spectrum':spec}))
+                await self._send_message(websocket, {'complete':True, 'spectrum':spec})
 
-    async def handle_error(self, websocket, err, errmsg):
+    async def _handle_error(self, websocket, err):
         """
         Transmits error messages to the client and logs them
         """
-        logging.error('{}: {}'.format(err, errmsg))
-        await websocket.send(json.dumps({'error':err, 'errormsg':errmsg}))
+        logging.error(str(err))
+        await self._send_message(websocket, {'error':err.errno, 'errormsg':err.msg})
+
+    async def _send_message(self, websocket, msg):
+        try:
+            await websocket.send(json.dumps(msg))
+        except websockets.ConnectionClosed:
+            logging.warn('Client disconnected during send')
