@@ -11,6 +11,8 @@ class WinspecErrorCodes(enum.IntEnum):
     # Hardware-related errors
     SpectrometerBusy = 1
     OutOfRange = 2
+    HardwareError = 3
+    ValueError = 4
 
     # Server-related errors
     JSONDecodeError = 101

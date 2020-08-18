@@ -25,8 +25,6 @@ class WinspecCOM:
 
     """
     def __init__(self):
-        logging.info('Initialised WinspecCOM')
-        self.wavelength = 0
         self._lock = threading.Lock()
 
     def set_wavelength(self, wavelength):
@@ -35,13 +33,51 @@ class WinspecCOM:
                                'Unable to update wavelength due to concurrent operation')
         try:
             logging.info('Set wavelength {}'.format(wavelength))
-            time.sleep(1)
-            self.wavelength = wavelength
+            win32.pythoncom.CoInitialize()
+            spectrograph = self._get_spectrograph()
+            
+            retval = spectrograph.SetParam(WinSpecLib.SPT_NEW_POSITION, float(wavelength))
+            
+            if retval == WinSpecLib.WRONG_WAVELENGTH:
+                raise WinspecError(WinspecErrorCodes.OutOfRange,
+                                   'Wavelength out of range')
+            elif retval != 0:
+                self._raise_hw_error(retval)
+            
+            retval = spectrograph.Move()
+            
+            if retval != 0:
+                self._raise_hw_error(retval)
+            
         finally:
             self._lock.release()
     
     def get_wavelength(self):
-        return self.wavelength
+        win32.pythoncom.CoInitialize()
+        spectrograph = self._get_spectrograph()
+        return spectrograph.GetParam(WinSpecLib.SPT_CUR_POSITION, 0)[0]
+        
+    def set_exposure_time(self, exp_time):
+        if not self._lock.acquire(blocking=False):
+            raise WinspecError(WinspecErrorCodes.SpectrometerBusy, 
+                               'Unable to update wavelength due to concurrent operation')
+        try:
+            logging.info('Set exposure time {}'.format(exp_time))
+            win32.pythoncom.CoInitialize()
+            wx32_expt = win32.Dispatch("WinX32.ExpSetup")
+            
+            retval = wx32_expt.SetParam(WinSpecLib.EXP_EXPOSURE, float(exp_time))
+            
+            if retval != 0:
+                self._raise_hw_error(retval)
+            
+        finally:
+            self._lock.release()
+            
+    def get_exposure_time(self):
+        win32.pythoncom.CoInitialize()
+        wx32_expt = win32.Dispatch("WinX32.ExpSetup")
+        return wx32_expt.GetParam(WinSpecLib.EXP_EXPOSURE)[0]
 
     def acquire_spectrum(self):
         if not self._lock.acquire(blocking=False):
@@ -53,19 +89,26 @@ class WinspecCOM:
             win32.pythoncom.CoInitialize()
             wx32_expt = win32.Dispatch("WinX32.ExpSetup")
             wx32_doc = win32.Dispatch("WinX32.DocFile")
-            wx32_expt.Start(wx32_doc)
+            
+            retval = wx32_expt.Start(wx32_doc)
+            
+            if retval != 0:
+                self._raise_hw_error(retval)
 
-            while wx32_expt.GetParam(WinSpecLib.EXP_RUNNING)[0]:
-                time.sleep(1)
+            while True:
+                done, status = wx32_expt.GetParam(WinSpecLib.EXP_RUNNING)
+                if status != 0:
+                    self._raise_hw_error(status)
+                if done:
+                    break
+                time.sleep(0.1)
 
             ptr = ctypes.POINTER(ctypes.c_float)
 
             raw_spectrum_buffer = wx32_doc.GetFrame(1, ptr)
 
-            raw_spectrum = np.array(raw_spectrum_buffer, dtype=np.uint16).flatten()
-            
-            spectrum = np.empty((2, len(raw_spectrum)))
-            spectrum[1] = raw_spectrum
+            intensity = np.array(raw_spectrum_buffer, dtype=np.uint16).flatten()
+
             calibration = wx32_doc.GetCalibration()
             
             poly_coeffs = np.zeros(calibration.Order + 1)
@@ -73,10 +116,17 @@ class WinspecCOM:
             for i in range(calibration.Order + 1):
                 poly_coeffs[i] = calibration.PolyCoeffs(i)
 
-            spectrum[0] = np.polyval(poly_coeffs[::-1], np.arange(1, 1+len(raw_spectrum)))
-            
-            logging.info('Acquire complete')
-            return spectrum.tolist()
+            wavelength = np.polyval(poly_coeffs[::-1], np.arange(1, 1+len(raw_spectrum)))
+
+            return [wavelength, intensity]
         
         finally:
             self._lock.release()
+            
+    def _get_spectrograph(self):
+        spectro_obj_mgr = win32.Dispatch("WinX32.SpectroObjMgr")
+        return spectro_obj_mgr.Current
+        
+    def _raise_hw_error(self, retval='unknown'):
+        raise WinspecError(WinspecErrorCodes.HardwareError,
+                           'Spectrometer error {}'.format(retval))
