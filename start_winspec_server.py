@@ -9,7 +9,7 @@ import winspec
 import asyncio
 import logging
 import sys
-import winspec
+import winspec.server
 
 logger = logging.getLogger()
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -21,7 +21,7 @@ logger.addHandler(handler)
 
 # Start server
 try:
-    asyncio.run(winspec.WinspecServer().run())
+    asyncio.run(winspec.server.WinspecServer().run())
 
 except KeyboardInterrupt:
     pass
