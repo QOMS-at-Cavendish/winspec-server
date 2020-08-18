@@ -9,6 +9,7 @@ import logging
 import websockets
 import json
 import winspec
+import winspec.winspec_com
 
 class WinspecServer:
     """
