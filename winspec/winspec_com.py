@@ -58,7 +58,7 @@ class WinspecCOM:
             while wx32_expt.GetParam(WinSpecLib.EXP_RUNNING)[0]:
                 time.sleep(1)
 
-            ptr = ctypes.c_float()
+            ptr = ctypes.POINTER(ctypes.c_float)
 
             raw_spectrum_buffer = wx32_doc.GetFrame(1, ptr)
 
@@ -68,15 +68,15 @@ class WinspecCOM:
             spectrum[1] = raw_spectrum
             calibration = wx32_doc.GetCalibration()
             
-            poly_coeffs = np.array([])
+            poly_coeffs = np.zeros(calibration.Order + 1)
 
             for i in range(calibration.Order + 1):
-                np.insert(poly_coeffs, 0, calibration.PolyCoeffs(i))
+                poly_coeffs[i] = calibration.PolyCoeffs(i)
 
-            spectrum[0] = np.polyval(poly_coeffs, range(1, 1+len(raw_spectrum)))
+            spectrum[0] = np.polyval(poly_coeffs[::-1], np.arange(1, 1+len(raw_spectrum)))
             
             logging.info('Acquire complete')
-            return spectrum
+            return spectrum.tolist()
         
         finally:
             self._lock.release()
