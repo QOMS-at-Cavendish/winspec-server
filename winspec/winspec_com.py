@@ -16,6 +16,7 @@ import win32com.client as win32
 import ctypes
 
 comtypes.client.GetModule(('{1A762221-D8BA-11CF-AFC2-508201C10000}', 3, 11))
+#pylint: disable=no-name-in-module, import-error
 import comtypes.gen.WINX32Lib as WinSpecLib
 
 class WinspecCOM:
@@ -48,6 +49,8 @@ class WinspecCOM:
                                'Unable to start acquisition due to concurrent operation')
         try:
             logging.info('Acquire spectrum')
+            #pylint: disable=no-member
+            win32.pythoncom.CoInitialize()
             wx32_expt = win32.Dispatch("WinX32.ExpSetup")
             wx32_doc = win32.Dispatch("WinX32.DocFile")
             wx32_expt.Start(wx32_doc)
@@ -55,14 +58,14 @@ class WinspecCOM:
             while wx32_expt.GetParam(WinSpecLib.EXP_RUNNING)[0]:
                 time.sleep(1)
 
-            raw_spectrum_buffer = ctypes.c_uint16()
+            ptr = ctypes.c_float()
 
-            wx32_doc.GetFrame(1, raw_spectrum_buffer)
+            raw_spectrum_buffer = wx32_doc.GetFrame(1, ptr)
 
-            raw_spectrum = np.ctypeslib.as_array(raw_spectrum_buffer)
+            raw_spectrum = np.array(raw_spectrum_buffer, dtype=np.uint16).flatten()
             
             spectrum = np.empty((2, len(raw_spectrum)))
-            spectrum[1] = spectrum
+            spectrum[1] = raw_spectrum
             calibration = wx32_doc.GetCalibration()
             
             poly_coeffs = np.array([])
