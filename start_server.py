@@ -3,6 +3,8 @@ WinSpec server start script
 
 Run this script on the spectrometer computer to start the server.
 
+Usage: python start_server <ip_address> <port>
+
 John Jarman <jcj27@cam.ac.uk>
 """
 import winspec
@@ -21,7 +23,7 @@ logger.addHandler(handler)
 
 # Start server
 try:
-    asyncio.run(winspec.server.WinspecServer().run())
+    asyncio.run(winspec.server.WinspecServer(*sys.argv[1:]).run())
 
 except KeyboardInterrupt:
     pass
