@@ -9,7 +9,7 @@ Spectrometer parameters can be set using `set_parameters(<param_name>=<param_val
 
 Trigger an acquisition and get the resulting spectrum using `acquire()`.
 
-Parameters are 'wavelength' (in nanometres) and 'exp_time' (in seconds)
+Parameters are 'wavelength' (in nanometres) and 'exposure_time' (in seconds)
 
 John Jarman <jcj27@cam.ac.uk>
 """
@@ -17,7 +17,8 @@ John Jarman <jcj27@cam.ac.uk>
 import winspec
 
 with winspec.WinspecClient('ws://localhost:1234') as ws_client:
-    ws_client.set_parameters(wavelength=650, exp_time=10)
+    ws_client.set_parameters(wavelength=650, exposure_time=10)
+    exp_time = ws_client.get_parameter('exposure_time')
     spectrum = ws_client.acquire()
 
 # spectrum[0] contains the wavelength axis
