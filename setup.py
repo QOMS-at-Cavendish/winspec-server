@@ -4,7 +4,7 @@ setup(
     name="winspec",
     version="0.1",
     packages=find_packages(),
-    scripts=["start_winspec_server.py"],
+    scripts=["start_server.py"],
     install_requires=[
           'websockets',
       ],

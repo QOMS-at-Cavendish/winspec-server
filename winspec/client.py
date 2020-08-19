@@ -11,7 +11,7 @@ import logging
 import winspec
 
 class WinspecClient:
-    def __init__(self, server_address, timeout = 100, retry_interval=1, retry_count=10):
+    def __init__(self, server_address, timeout = 100):
         self.host = server_address
         self.loop = None
         self.timeout = timeout
@@ -20,10 +20,6 @@ class WinspecClient:
         self.running = threading.Event()
 
         self._recv_timeout = 1
-        self.retry_count = retry_count
-        self.retry_interval = retry_interval
-    
-    # Context manager methods
 
     def __enter__(self): 
         self.connect()
@@ -49,23 +45,22 @@ class WinspecClient:
     def disconnect(self):
         self.stop.set()
 
-    #####################
-    # Synchronous methods
-    #####################
-
     def set_parameters(self, **params):
         if not self.connected.is_set():
             self.stop.set()
-            raise ConnectionError('Cannot set parameters: server not connected')
+            raise ConnectionError('Server not connected')
         f = asyncio.run_coroutine_threadsafe(self._set_parameters_async(**params), self.loop)
         return f.result(self.timeout)
 
-    def acquire(self):
+    def get_parameters(self, *params):
         if not self.connected.is_set():
             self.stop.set()
-            raise ConnectionError('Cannot acquire: server not connected')
-        f = asyncio.run_coroutine_threadsafe(self._acquire_async(), self.loop)
+            raise ConnectionError('Server not connected')
+        f = asyncio.run_coroutine_threadsafe(self._get_parameters_async(*params), self.loop)
         return f.result(self.timeout)
+
+    def acquire(self):
+        return self.get_parameters('spectrum')['spectrum']
 
     ################
     # Async methods
@@ -105,11 +100,13 @@ class WinspecClient:
             self._websocket = None
 
     async def _set_parameters_async(self, **params):
-        logging.info('Set')
         return await self._send_and_wait({'cmd':'set', **params})
 
-    async def _acquire_async(self):
-        return await self._send_and_wait({'cmd':'acquire'})
+    async def _get_parameters_async(self, *params):
+        cmd = {'cmd':'get'}
+        for param in params:
+            cmd[param] = None
+        return await self._send_and_wait(cmd)
 
     async def _send_and_wait(self, cmd):
         await self._clear_recv_queue()
@@ -119,6 +116,7 @@ class WinspecClient:
             if 'error' in response.keys():
                 self._handle_error(response['error'], response['errormsg'])
             if 'complete' in response.keys():
+                response.pop('complete')
                 return response
 
     async def _clear_recv_queue(self):

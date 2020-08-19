@@ -33,6 +33,7 @@ class WinspecCOM:
                                'Unable to update wavelength due to concurrent operation')
         try:
             logging.info('Set wavelength {}'.format(wavelength))
+            #pylint: disable=no-member
             win32.pythoncom.CoInitialize()
             spectrograph = self._get_spectrograph()
             
@@ -53,6 +54,7 @@ class WinspecCOM:
             self._lock.release()
     
     def get_wavelength(self):
+        #pylint: disable=no-member
         win32.pythoncom.CoInitialize()
         spectrograph = self._get_spectrograph()
         return spectrograph.GetParam(WinSpecLib.SPT_CUR_POSITION, 0)[0]
@@ -63,6 +65,7 @@ class WinspecCOM:
                                'Unable to update wavelength due to concurrent operation')
         try:
             logging.info('Set exposure time {}'.format(exp_time))
+            #pylint: disable=no-member
             win32.pythoncom.CoInitialize()
             wx32_expt = win32.Dispatch("WinX32.ExpSetup")
             
@@ -75,6 +78,7 @@ class WinspecCOM:
             self._lock.release()
             
     def get_exposure_time(self):
+        #pylint: disable=no-member
         win32.pythoncom.CoInitialize()
         wx32_expt = win32.Dispatch("WinX32.ExpSetup")
         return wx32_expt.GetParam(WinSpecLib.EXP_EXPOSURE)[0]
@@ -116,13 +120,13 @@ class WinspecCOM:
             for i in range(calibration.Order + 1):
                 poly_coeffs[i] = calibration.PolyCoeffs(i)
 
-            wavelength = np.polyval(poly_coeffs[::-1], np.arange(1, 1+len(raw_spectrum)))
+            wavelength = np.polyval(poly_coeffs[::-1], np.arange(1, 1+len(intensity)))
 
             return [wavelength, intensity]
         
         finally:
             self._lock.release()
-            
+        
     def _get_spectrograph(self):
         spectro_obj_mgr = win32.Dispatch("WinX32.SpectroObjMgr")
         return spectro_obj_mgr.Current

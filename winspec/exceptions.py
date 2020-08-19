@@ -12,11 +12,12 @@ class WinspecErrorCodes(enum.IntEnum):
     SpectrometerBusy = 1
     OutOfRange = 2
     HardwareError = 3
-    ValueError = 4
+    ParameterError = 4
 
     # Server-related errors
     JSONDecodeError = 101
     UnrecognisedVariable = 102
+    UnrecognisedCommand = 103
 
 class WinspecError(Exception):
     def __init__(self, errno=-1, msg=''):
