@@ -94,16 +94,16 @@ class WinspecCOM:
             wx32_expt = win32.Dispatch("WinX32.ExpSetup")
             wx32_doc = win32.Dispatch("WinX32.DocFile")
             
-            retval = wx32_expt.Start(wx32_doc)
+            retval = wx32_expt.Start(wx32_doc)[0]
             
-            if retval != 0:
+            if retval != True:
                 self._raise_hw_error(retval)
 
             while True:
-                done, status = wx32_expt.GetParam(WinSpecLib.EXP_RUNNING)
+                running, status = wx32_expt.GetParam(WinSpecLib.EXP_RUNNING)
                 if status != 0:
                     self._raise_hw_error(status)
-                if done:
+                if not running:
                     break
                 time.sleep(0.1)
 
@@ -122,7 +122,7 @@ class WinspecCOM:
 
             wavelength = np.polyval(poly_coeffs[::-1], np.arange(1, 1+len(intensity)))
 
-            return [wavelength, intensity]
+            return [wavelength.tolist(), intensity.tolist()]
         
         finally:
             self._lock.release()
