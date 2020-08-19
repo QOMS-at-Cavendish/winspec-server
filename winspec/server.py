@@ -9,7 +9,7 @@ import logging
 import websockets
 import json
 import winspec
-import winspec.winspec_dummy
+import winspec.winspec_com
 
 class WinspecServer:
     """
@@ -26,7 +26,7 @@ class WinspecServer:
         self.port = port
         self.shutdown_request = False
 
-        self.winspec = winspec.winspec_dummy.WinspecCOM()
+        self.winspec = winspec.winspec_com.WinspecCOM()
 
         self.vars = {
             'wavelength':   {'getter':self.winspec.get_wavelength,
