@@ -1,5 +1,10 @@
-"""
-Websockets server for controlling WinSpec over the network
+"""Websockets server for controlling WinSpec over the network.
+
+This module contains the server object WinspecServer. This runs continuously,
+accepting connections and passing incoming commands through to Winspec.
+
+Note that there is no security or authentication, so it is a good idea to run
+this behind a firewall with a whitelist of the PCs required to access it.
 
 John Jarman <jcj27@cam.ac.uk>
 """
@@ -12,12 +17,17 @@ import winspec
 import winspec.winspec_com
 
 class WinspecServer:
-    """
-    WinspecServer main class
+    """Websockets server for controlling Winspec
 
-    Usage:
-    ws = WinspecServer(ip, port)
-    asyncio.run(ws.run())
+    Provide the IP address and TCP port to listen for connections.
+
+    Args:
+        ip (str): IP address
+        port (int): TCP port
+
+    Example::
+        ws = WinspecServer(ip, port)
+        asyncio.run(ws.run())
     """
 
     def __init__(self, ip='localhost', port=1234):
@@ -38,8 +48,7 @@ class WinspecServer:
         }
 
     async def run(self):
-        """
-        Run websocket server.
+        """Run websocket server.
         
         Call using asyncio.run()
 
@@ -52,9 +61,14 @@ class WinspecServer:
         logging.info('Server shutdown')
 
     async def _serve(self, websocket, path):
-        """
+        """Server connection handler
+
         Handles incoming connections, decodes commands and passes to the command
         handler.
+
+        Args:
+            websocket (WebSocketServerProtocol): Client object.
+            path (str): URI (Unused).
         """
         try:
             self.connections.add(websocket)
@@ -65,7 +79,7 @@ class WinspecServer:
                     # Decode and handle incoming commands
                     cmd = json.loads(command)
                     logging.debug('{}: {}'.format(websocket.remote_address[0], cmd))
-                    await self._handle_command(cmd, websocket)
+                    await self._handle_command(websocket, cmd)
                 except json.JSONDecodeError as err:
                     await self._handle_error(websocket, winspec.WinspecError(
                                              winspec.WinspecErrorCodes.JSONDecodeError, 
@@ -73,16 +87,19 @@ class WinspecServer:
         finally:
             self.connections.discard(websocket)
 
-    async def _handle_command(self, command, websocket):
-        """
-        Handle commands from connected clients
+    async def _handle_command(self, websocket, command):
+        """Handle commands from connected clients
+        
+        Command format::
+            {'cmd':<command>, '<variable_name>':<value>, ...}
 
-        Format: {'cmd':<command>, '<variable_name>':<value>, ...}
-
-        'cmd' is one of: 'set', 'get' or 'acquire'
+        'cmd' is one of:
             - 'set': set variables
             - 'get': request value of specified variables
 
+        Args:
+            websocket (WebSocketServerProtocol): Client object
+            command (dict): Command
         """
         try:
             return_vals = dict()
@@ -136,13 +153,24 @@ class WinspecServer:
             await self._send_message(websocket, {'complete':True, **return_vals})
 
     async def _handle_error(self, websocket, err):
-        """
-        Transmits error messages to the client and logs them
+        """Transmits error messages to the client and logs them.
+
+        Args:
+            websocket (WebSocketServerProtocol): Client object
+            err (WinspecError): Error to send
+
         """
         logging.error(str(err))
         await self._send_message(websocket, {'error':err.errno, 'errormsg':err.msg})
 
     async def _send_message(self, websocket, msg):
+        """Encodes and sends messages to the client.
+        
+        Args:
+            websocket (WebSocketServerProtocol): Client object
+            msg (dict): Object to send. Must be JSON serializable
+        """
+
         try:
             await websocket.send(json.dumps(msg))
         except websockets.ConnectionClosed:

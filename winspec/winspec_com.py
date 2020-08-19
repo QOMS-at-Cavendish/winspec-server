@@ -1,6 +1,7 @@
 
-"""
-WinSpec communication class
+"""WinSpec COM communication class
+
+Communicate with Winspec32 via COM/OLE/ActiveX
 
 John Jarman <jcj27@cam.ac.uk>
 """
@@ -20,14 +21,26 @@ comtypes.client.GetModule(('{1A762221-D8BA-11CF-AFC2-508201C10000}', 3, 11))
 import comtypes.gen.WINX32Lib as WinSpecLib
 
 class WinspecCOM:
-    """
-    Class for communication with WinSpec using COM
+    """Communicate with WinSpec using COM
 
+    All methods block until the required operation is completed. Methods are 
+    thread-safe and raise an exception if a conflicting operation is attempted.
     """
+
     def __init__(self):
         self._lock = threading.Lock()
 
     def set_wavelength(self, wavelength):
+        """Set wavelength
+
+        Moves grating to change central wavelength of spectrograph.
+
+        Args:
+            wavelength (float): Wavelength to set in nanometres.
+
+        Raises:
+            winspec.WinspecError for hardware problems.
+        """
         if not self._lock.acquire(blocking=False):
             raise WinspecError(WinspecErrorCodes.SpectrometerBusy, 
                                'Unable to update wavelength due to concurrent operation')
@@ -54,12 +67,29 @@ class WinspecCOM:
             self._lock.release()
     
     def get_wavelength(self):
+        """Get wavelength.
+
+        This returns the currently set wavelength of the spectrograph. The value
+        is read from the Winspec software, which just reports its internally stored
+        value, so in some cases this may not reflect the actual position of the grating.
+
+        Returns:
+            wavelength (float): The currently set wavelength in nanometres
+        """
         #pylint: disable=no-member
         win32.pythoncom.CoInitialize()
         spectrograph = self._get_spectrograph()
         return spectrograph.GetParam(WinSpecLib.SPT_CUR_POSITION, 0)[0]
         
     def set_exposure_time(self, exp_time):
+        """Set exposure time.
+
+        Args:
+            exp_time (float): Exposure time in seconds.
+        
+        Raises:
+            winspec.WinspecError for hardware problems.
+        """
         if not self._lock.acquire(blocking=False):
             raise WinspecError(WinspecErrorCodes.SpectrometerBusy, 
                                'Unable to update wavelength due to concurrent operation')
@@ -78,12 +108,22 @@ class WinspecCOM:
             self._lock.release()
             
     def get_exposure_time(self):
+        """Get exposure time
+
+        Returns:
+            float: Exposure time in seconds.
+        """
         #pylint: disable=no-member
         win32.pythoncom.CoInitialize()
         wx32_expt = win32.Dispatch("WinX32.ExpSetup")
         return wx32_expt.GetParam(WinSpecLib.EXP_EXPOSURE)[0]
 
     def acquire_spectrum(self):
+        """Acquire spectrum.
+
+        Returns::
+            [wavelength[], intensity[]]
+        """
         if not self._lock.acquire(blocking=False):
             raise WinspecError(WinspecErrorCodes.SpectrometerBusy,
                                'Unable to start acquisition due to concurrent operation')
@@ -128,9 +168,19 @@ class WinspecCOM:
             self._lock.release()
         
     def _get_spectrograph(self):
+        """Get current spectrograph object
+        
+        Returns:
+            WinX32.SpectroObj: the current spectrograph object.
+        """
         spectro_obj_mgr = win32.Dispatch("WinX32.SpectroObjMgr")
         return spectro_obj_mgr.Current
         
     def _raise_hw_error(self, retval='unknown'):
+        """Raise generic WinspecError in response to non-zero return value.
+
+        Args:
+            retval (int): The non-zero return value.
+        """
         raise WinspecError(WinspecErrorCodes.HardwareError,
                            'Spectrometer error {}'.format(retval))

@@ -1,5 +1,4 @@
-"""
-WinSpec server start script
+"""WinSpec server start script
 
 Run this script on the spectrometer computer to start the server.
 

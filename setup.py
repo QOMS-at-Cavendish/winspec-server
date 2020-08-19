@@ -1,3 +1,11 @@
+"""setup.py for winspec
+
+Installs winspec package.
+
+Example::
+    $ python setup.py install
+"""
+
 from setuptools import setup, find_packages
 
 setup(

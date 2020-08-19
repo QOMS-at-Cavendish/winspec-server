@@ -1,5 +1,7 @@
-"""
-Exception class for Winspec-related errors
+"""Exception for Winspec-related errors
+
+Uses an error number to allow errors to be communicated over the websocket and
+re-raised on the client side.
 
 John Jarman <jcj27@cam.ac.uk>
 """
@@ -20,6 +22,16 @@ class WinspecErrorCodes(enum.IntEnum):
     UnrecognisedCommand = 103
 
 class WinspecError(Exception):
+    """Class for hardware and server errors.
+
+    Args:
+        err (int): winspec.WinspecErrorCodes error code
+        errmsg (str): Supplementary error message
+
+    Attributes:
+        errno (int): Error code (see `WinspecErrorCodes`)
+        msg (str): Supplementary error message
+    """
     def __init__(self, errno=-1, msg=''):
         super().__init__(self)
         self.msg = msg
@@ -30,5 +42,3 @@ class WinspecError(Exception):
 
     def __str__(self):
         return self.__repr__()
-
-    
