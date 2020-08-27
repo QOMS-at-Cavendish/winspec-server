@@ -118,6 +118,17 @@ class WinspecCOM:
         wx32_expt = win32.Dispatch("WinX32.ExpSetup")
         return wx32_expt.GetParam(WinSpecLib.EXP_EXPOSURE)[0]
 
+    def get_detector_temp(self):
+        """Get detector temperature
+
+        Returns:
+            float: Detector temperature in degrees C.
+        """
+        #pylint: disable=no-member
+        win32.pythoncom.CoInitialize()
+        wx32_expt = win32.Dispatch("WinX32.ExpSetup")
+        return wx32_expt.GetParam(WinSpecLib.EXP_ACTUAL_TEMP)[0]
+
     def acquire_spectrum(self):
         """Acquire spectrum.
 

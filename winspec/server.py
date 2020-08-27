@@ -44,6 +44,8 @@ class WinspecServer:
             'exposure_time':{'getter':self.winspec.get_exposure_time,
                              'setter':self.winspec.set_exposure_time},
             'spectrum':     {'getter':self.winspec.acquire_spectrum,
+                             'setter':None},
+            'detector_temp':{'getter':self.winspec.get_detector_temp,
                              'setter':None}
         }
 
