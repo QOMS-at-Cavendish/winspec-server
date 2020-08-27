@@ -23,7 +23,6 @@ import json
 import asyncio
 import threading
 import logging
-import time
 import winspec
 
 class WinspecClient:
@@ -40,7 +39,8 @@ class WinspecClient:
         self.timeout = timeout
         self.stop = threading.Event()
         self.connected = threading.Event()
-        self.running = threading.Event()
+        
+        self.thread = None
 
         self._recv_timeout = 1
 
@@ -59,16 +59,17 @@ class WinspecClient:
 
         Returns when the client thread has connected and is ready to send commands.
         """
-        if self.running.is_set():
-            return
+        if self.thread is not None:
+            raise ConnectionError('Already connected')
         self.stop.clear()
-        threading.Thread(target=self._start_async_loop).start()
+        self.thread = threading.Thread(target=self._start_async_loop, daemon=True)
+        self.thread.start()
         while not self.connected.is_set():
             try:
                 self.connected.wait(timeout=0.1)
             except TimeoutError:
                 pass
-            if not self.running.is_set():
+            if not self.thread.is_alive():
                 raise ConnectionError('Unable to connect to server')
 
     def disconnect(self):
@@ -77,8 +78,8 @@ class WinspecClient:
         Return when the thread has stopped.
         """
         self.stop.set()
-        while self.running.is_set():
-            time.sleep(0.1)
+        self.thread.join()
+        self.thread = None
 
     def set_parameters(self, **params):
         """Set parameters.
@@ -92,7 +93,7 @@ class WinspecClient:
         """
         self._check_connected()
         f = asyncio.run_coroutine_threadsafe(self._set_parameters_async(**params), self.loop)
-        f.result(self.timeout)
+        f.result()
 
     def get_parameter(self, param):
         """Get parameter.
@@ -110,7 +111,7 @@ class WinspecClient:
 
         self._check_connected()
         f = asyncio.run_coroutine_threadsafe(self._get_parameters_async(param), self.loop)
-        return f.result(self.timeout)[param]
+        return f.result()[param]
 
     def acquire(self):
         """Acquire spectrum.
@@ -142,9 +143,7 @@ class WinspecClient:
 
         Blocks execution until the event loop completes.
         """
-        self.running.set()
         asyncio.run(self._run_async())
-        self.running.clear()
 
     async def _run_async(self):
         """Main loop for websocket client.
@@ -179,6 +178,9 @@ class WinspecClient:
 
                     except asyncio.TimeoutError:
                         pass
+
+        except websockets.ConnectionClosed as err:
+            logging.error('Unexpected disconnect {}'.format(err))
             
         finally:
             logging.info('Connection closed')
@@ -208,7 +210,8 @@ class WinspecClient:
         await self._clear_recv_queue()
         await self._websocket.send(json.dumps(cmd))
         while True:
-            response = await self._recv_queue.get()
+            response = await asyncio.wait_for(self._recv_queue.get(), 
+                                              timeout=self.timeout)
             if 'error' in response.keys():
                 self._handle_error(response['error'], response['errormsg'])
             if 'complete' in response.keys():
