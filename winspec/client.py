@@ -163,7 +163,6 @@ class WinspecClient:
             async with websockets.connect(self.host) as websocket:
                 self._websocket = websocket
                 self.connected.set()
-                logging.info('Connected to server')
                 while not self.stop.is_set():
                     try:
                         # Get message from socket and decode it, with short timeout
@@ -183,7 +182,6 @@ class WinspecClient:
             logging.error('Unexpected disconnect {}'.format(err))
             
         finally:
-            logging.info('Connection closed')
             self.connected.clear()
             self._websocket = None
 
