@@ -7,7 +7,6 @@ Usage: python start_server <ip_address> <port>
 John Jarman <jcj27@cam.ac.uk>
 """
 import winspec
-import asyncio
 import logging
 import sys
 import winspec.server
@@ -22,7 +21,7 @@ logger.addHandler(handler)
 
 # Start server
 try:
-    asyncio.run(winspec.server.WinspecServer(*sys.argv[1:]).run())
+    winspec.server.WinspecServer(*sys.argv[1:]).run()
 
 except KeyboardInterrupt:
     pass

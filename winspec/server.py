@@ -27,7 +27,7 @@ class WinspecServer:
 
     Example::
         ws = WinspecServer(ip, port)
-        asyncio.run(ws.run())
+        ws.run()
     """
 
     def __init__(self, ip='localhost', port=1234):
@@ -49,8 +49,15 @@ class WinspecServer:
                              'setter':None}
         }
 
-    async def run(self):
+    def run(self):
         """Run websocket server.
+
+        Returns when server shuts down.
+        """
+        asyncio.run(self._run())
+        
+    async def _run(self):
+        """Run websocket server (async)
         
         Call using asyncio.run()
 
