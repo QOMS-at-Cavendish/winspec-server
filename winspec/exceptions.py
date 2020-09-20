@@ -20,6 +20,7 @@ class WinspecErrorCodes(enum.IntEnum):
     JSONDecodeError = 101
     UnrecognisedVariable = 102
     UnrecognisedCommand = 103
+    AuthenticationError = 104
 
 class WinspecError(Exception):
     """Class for hardware and server errors.

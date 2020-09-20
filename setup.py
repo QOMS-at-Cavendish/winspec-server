@@ -15,6 +15,7 @@ setup(
     scripts=["start_server.py"],
     install_requires=[
           'websockets',
+          'pyjwt',
       ],
 
     author="John Jarman",

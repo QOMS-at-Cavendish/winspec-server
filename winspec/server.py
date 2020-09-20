@@ -13,6 +13,8 @@ import concurrent.futures
 import logging
 import websockets
 import json
+import secrets
+import jwt
 import winspec
 import winspec.winspec_com
 
@@ -24,13 +26,14 @@ class WinspecServer:
     Args:
         ip (str): IP address
         port (int): TCP port
+        token (str): Client token
 
     Example::
         ws = WinspecServer(ip, port)
         ws.run()
     """
 
-    def __init__(self, ip='localhost', port=1234):
+    def __init__(self, token, ip='localhost', port=1234):
         self.connections = set()
         self.ip = ip
         self.port = port
@@ -38,6 +41,8 @@ class WinspecServer:
 
         self.winspec = winspec.winspec_com.WinspecCOM()
 
+        self.token = token
+            
         self.vars = {
             'wavelength':   {'getter':self.winspec.get_wavelength,
                              'setter':self.winspec.set_wavelength},
@@ -86,13 +91,16 @@ class WinspecServer:
             async for command in websocket:
                 try:
                     # Decode and handle incoming commands
-                    cmd = json.loads(command)
+                    cmd = jwt.decode(command, self.token, algorithms=['HS256'])
                     logging.debug('{}: {}'.format(websocket.remote_address[0], cmd))
                     await self._handle_command(websocket, cmd)
-                except json.JSONDecodeError as err:
+
+                except jwt.exceptions.DecodeError as err:
                     await self._handle_error(websocket, winspec.WinspecError(
-                                             winspec.WinspecErrorCodes.JSONDecodeError, 
+                                             winspec.WinspecErrorCodes.AuthenticationError, 
                                              str(err)))
+                    await websocket.close(code=1011, reason='Authentication error')
+                    break
         finally:
             self.connections.discard(websocket)
 
@@ -181,6 +189,7 @@ class WinspecServer:
         """
 
         try:
-            await websocket.send(json.dumps(msg))
+            signed_msg = jwt.encode(msg, self.token, algorithm='HS256')
+            await websocket.send(signed_msg)
         except websockets.ConnectionClosed:
             logging.warn('Client disconnected before response sent')

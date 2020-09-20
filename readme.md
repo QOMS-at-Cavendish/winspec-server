@@ -24,9 +24,10 @@ packages using `pip`.
 3. Run `python start_server.py <ip_address>` on the spectrometer PC, replacing 
 `<ip_address>` with the IP of the spectrometer PC.
 
-4. The server has no security or authentication built in, so edit the Python
-rules in Windows Firewall, changing the scope to only include the IP addresses
-or address range used by the lab PCs.
+4. Use the value in `token.txt` when connecting the client
+
+5. Edit the Python rules in Windows Firewall, changing the scope to only include 
+the IP addresses or address range used by the lab PCs for added security
 
 If Winspec is running as administrator, you will need to execute Python from
 a console that also has administrator privileges.

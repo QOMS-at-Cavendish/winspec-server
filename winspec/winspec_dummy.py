@@ -88,6 +88,9 @@ class WinspecCOM:
         """
         return self.exposure
 
+    def get_detector_temp(self):
+        return self.det_temp
+
     def acquire_spectrum(self):
         """Acquire spectrum.
 

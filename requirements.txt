@@ -1,3 +1,4 @@
 websockets
 pywin32
 comtypes
+pyjwt

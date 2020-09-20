@@ -24,17 +24,20 @@ import asyncio
 import threading
 import logging
 import winspec
+import jwt
 
 class WinspecClient:
     """Winspec client class
 
     Args:
         server_address (str): Hostname of the server. E.g. `ws://192.168.0.1:1234`
+        token (str): Authentication token
         timeout (float, optional): Max waiting time for server operations. Default
             to 100 secs.
     """
-    def __init__(self, server_address, timeout = 100):
+    def __init__(self, server_address, token, timeout = 100):
         self.host = server_address
+        self.token = token
         self.loop = None
         self.timeout = timeout
         self.stop = threading.Event()
@@ -167,12 +170,13 @@ class WinspecClient:
                     try:
                         # Get message from socket and decode it, with short timeout
                         # so the stop flag can be checked periodically
-                        msg = json.loads(await asyncio.wait_for(websocket.recv(), 
-                                                            self._recv_timeout))
+                        msg_enc = await asyncio.wait_for(websocket.recv(), 
+                                                         self._recv_timeout)
+                        msg = jwt.decode(msg_enc, self.token, algorithms=['HS256'])
                         # Put the message on the receive queue for processing
                         await self._recv_queue.put(msg)
 
-                    except json.JSONDecodeError as err:
+                    except jwt.DecodeError as err:
                         logging.error('Bad JSON from server: {}'.format(err))
 
                     except asyncio.TimeoutError:
@@ -206,10 +210,12 @@ class WinspecClient:
         """Send a message and wait for the 'complete' response.
         """
         await self._clear_recv_queue()
-        await self._websocket.send(json.dumps(cmd))
+        signed_cmd = jwt.encode(cmd, self.token, algorithm='HS256')
+        await self._websocket.send(signed_cmd)
         while True:
             response = await asyncio.wait_for(self._recv_queue.get(), 
                                               timeout=self.timeout)
+
             if 'error' in response.keys():
                 self._handle_error(response['error'], response['errormsg'])
             if 'complete' in response.keys():

@@ -16,7 +16,12 @@ John Jarman <jcj27@cam.ac.uk>
 
 import winspec
 
-with winspec.WinspecClient('ws://localhost:1234') as ws_client:
+server_address = 'ws://localhost:1234'
+
+# Copy this from token.txt on the server PC, in the winspec-server directory
+token = '27bdb9304ba259abc6b41d86dbdecc8b8c08d68537c8d970555eb4e2658d05f0'
+
+with winspec.WinspecClient(server_address, token) as ws_client:
     ws_client.set_parameters(wavelength=650, exposure_time=10)
     exp_time = ws_client.get_parameter('exposure_time')
     spectrum = ws_client.acquire()
